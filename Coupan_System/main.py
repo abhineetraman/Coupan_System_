@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, redirect
 from flask_sqlalchemy import SQLAlchemy
 from calendar import datetime
-from random import randint
 
 
 app = Flask(__name__)
