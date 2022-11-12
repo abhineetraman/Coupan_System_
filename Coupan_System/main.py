@@ -1,13 +1,22 @@
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, session
+from flask_restful import Resource, Api
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.utils import secure_filename
 from calendar import datetime
+from os.path import join
 
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///coupon_database.sqlite3'
+app.config['UPLOAD_FOLDER'] = 'static'
+app.config['MAX_CONTENT_PATH'] = '1000000'
+app.secret_key = 'asking_is_not_good'
 db = SQLAlchemy()
+api = Api(app)
 db.init_app(app)
 app.app_context().push()
+
+timestamp, cost, receiving_vendor = " ", 0, " "
 
 
 class Users(db.Model):
@@ -22,7 +31,7 @@ class studentInfo(db.Model):
     stu_id = db.Column(db.String, db.ForeignKey("Users.id"), primary_key=True)
     name = db.Column(db.String, nullable=False)
     dept = db.Column(db.String, nullable=False)
-    coupon_code = db.column(db.String, db.ForeignKey("coupon.coupon_code"))
+    email = db.Column(db.String, nullable=False)
 
 
 class vendorInfo(db.Model):
@@ -39,6 +48,17 @@ class AdminInfo(db.Model):
     dept = db.Column(db.String, nullable=False)
 
 
+class events(db.Model):
+    __tablename__ = "events"
+    sl_no = db.Column(db.Integer, autoincrement=True, primary_key=True)
+    timestamp = db.Column(db.String, nullable=False)
+    name = db.Column(db.String, nullable=False)
+    issue_dept = db.Column(db.String, nullable=False)
+    spokesperson = db.Column(db.String, nullable=False)
+    mode = db.Column(db.String, nullable=False)
+    created_by = db.Column(db.String, db.ForeignKey("admin.admin_id"), nullable=False)
+
+
 class Coupon(db.Model):
     __tablename__ = "Coupon"
     sl_no = db.Column(db.Integer, primary_key=True)
@@ -47,6 +67,16 @@ class Coupon(db.Model):
     validity = db.Column(db.String, nullable=False)
     issued_to = db.Column(db.String)
 
+
+class Registration(db.Model):
+    __tablename__ = "registration"
+    sl_no = db.Column(db.Integer, autoincrement=True, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    roll_no = db.Column(db.String, db.ForeignKey("studentInfo.stu_id"), nullable=False)
+    dept = db.Column(db.String, nullable=False)
+    email = db.Column(db.String, db.ForeignKey("studentInfo.email"), nullable=False)
+    registered_event = db.Column(db.String, db.ForeignKey("events.name"), nullable=False)
+    attended = db.Column(db.String)
 
 
 @app.route("/", methods=["GET"])
@@ -65,16 +95,27 @@ def login():
         for i in user:
             if fid == i.id and fpassword == i.password:
                 role = i.role
+                session['username'] = fid
                 return redirect("/" + role + "/" + fid)
         return render_template("login.html", error="Incorrect id or password")
 
 
-@app.route("/student/<string:roll_no>/")
+@app.route("/student/<string:roll_no>")
 def home_student(roll_no):
     roll_no = str(roll_no)
     stu = studentInfo.query.filter_by(stu_id=roll_no).one()
     coup = Coupon.query.filter_by(issued_to=roll_no).all()
     return render_template("home_student.html", coup=coup, msg="", stu=stu)
+
+
+@app.route("/event_admin/<string:id>")
+def home_event_admin(id):
+    admin = AdminInfo.query.filter_by(admin_id=id).one()
+    event = events.query.filter_by(created_by=id).all()
+    total = len(event)
+    for i in range(total//2):
+        event[i], event[-i] = event[-i], event[i]
+    return render_template("event_admin_home.html", admin=admin, event=event)
 
 
 @app.route("/vendor/<string:vendor_id>")
@@ -140,7 +181,7 @@ def transfer(admin_id):
 
 
 @app.route("/<string:id>/redeem/<string:coupon_code>")
-def redeem(id,coupon_code):
+def redeem(id, coupon_code):
     coup = Coupon.query.filter_by(coupon_code=coupon_code).one()
     if coup:
         dept = coup.coupon_code[0:2:]
@@ -166,11 +207,13 @@ def add_stu(admin_id):
         dept = admin.dept
 
     if request.method == "GET":
-        return render_template("add_stu.html",admin=admin)
+        return render_template("add_stu.html", admin=admin)
 
     elif request.method == "POST":
         file = request.files["stu"]
-        val = file.readlines()[1:]
+        file.save(join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename)))
+        f = open("static/" + secure_filename(file.filename), 'r')
+        val = f.readlines()[1:]
         for i in val:
             fields = i.split(',')
             roll_no = fields[0]
@@ -188,8 +231,9 @@ def add_stu(admin_id):
 @app.route("/<string:admin_id>/add_vendor", methods=["GET", "POST"])
 def add_vendor(admin_id):
     admin = AdminInfo.query.filter_by(admin_id=admin_id).one()
+    user = Users.query.filter_by(id=admin_id).one()
     if request.method == "GET":
-        return render_template("add_vendor.html", admin=admin)
+        return render_template("add_vendor.html", admin=admin, user=user)
 
     elif request.method == "POST":
         name = request.form["vname"]
@@ -201,7 +245,8 @@ def add_vendor(admin_id):
         tmp_vendor = vendorInfo(vendor_id=vid, vendor_name=name)
         db.session.add(tmp_vendor)
         db.session.commit()
-        return redirect("/admin/" + admin_id)
+        if user:
+            return redirect("/" + user.role + "/" + admin_id)
 
 
 @app.route("/<string:admin_id>/del_stu", methods=["POST", "GET"])
@@ -216,9 +261,12 @@ def delete_stu(admin_id):
     elif request.method == "POST":
         low = request.form["low"]
         high = request.form["high"]
-        stu = studentInfo.query.filter_by(stu_id > low, stu_id < high).all()
+        stu = db.session.query(studentInfo).filter(studentInfo.stu_id > str(low)).all()
         for i in stu:
-            db.session.delete(i)
+            if i.stu_id < str(high):
+                tmp_user = Users.query.filter_by(id=i.stu_id).one()
+                db.session.delete(i)
+                db.session.delete(tmp_user)
         db.session.commit()
         return redirect("/admin/" + admin_id)
 
@@ -227,7 +275,8 @@ def delete_stu(admin_id):
 def show_vendor(admin_id):
     vendor = vendorInfo.query.all()
     admin = AdminInfo.query.filter_by(admin_id=admin_id).one()
-    return render_template("del_vendor.html", vendor=vendor, admin=admin)
+    user = Users.query.filter_by(id=admin_id).one()
+    return render_template("del_vendor.html", vendor=vendor, admin=admin, user=user)
 
 
 @app.route("/<string:admin_id>/delete_vendor/<string:vendor_id>", methods=["POST", "GET"])
@@ -238,12 +287,100 @@ def delete_vendor(admin_id, vendor_id):
     vendor = Users.query.filter_by(id=vendor_id).one()
     db.session.delete(vendor)
     db.session.commit()
-    return redirect("/admin/" + admin_id)
+    user = Users.query.filter_by(id=admin_id).one()
+    if user:
+        return redirect("/" + user.role + "/" + admin_id)
+
+
+@app.route("/<string:admin_id>/attendance/<int:event_id>", methods=["GET", "POST"])
+def attendance(admin_id, event_id):
+    admin = AdminInfo.query.filter_by(admin_id=admin_id).one()
+    event = events.query.filter_by(sl_id=event_id).one()
+    event_name = " "
+    if event:
+        event_name = event.name
+    registered_candidate = Registration.query.filter_by(regisrted_event=event_name).all()
+    if request.method == "GET":
+        return render_template("attendance.html", admin=admin, candidate=registered_candidate, event_name=event_name, event_id=event_id)
+    elif request.method == "POST":
+        for i in registered_candidate:
+            value = request.form.getlist(i.sl_no)
+            if value:
+                i.atteded = "Yes"
+
+        db.session.commit()
+        participants = Registration.query.filter_by(registered_event=event_name).all()
+        quantity = len(participants)
+        year = str(datetime.date.today())[2:4:]
+        for i in range(1, quantity + 1):
+            if len(str(i)) == 1:
+                C_code = event_name[0:3:].toupper() + year + "00" + str(quantity)
+            elif len(str(i)) == 2:
+                C_code = event_name[0:3:].toupper() + year + "0" + str(quantity)
+            elif len(str(i)) == 3:
+                C_code = event_name[0:3:].toupper() + year + str(quantity)
+            tmp_Coupon = Coupon(sl_no=quantity, coupon_code=C_code, price=price, validity=timestamp, issued_to=participants[i].roll_no)
+            db.session.add(tmp_Coupon)
+        vendor.issued_dept = event_name
+        db.session.commit()
+        return redirect("/event_admin" + admin_id)
+
+
+@app.route("/<string:admin_id>/add_event", methods=["GET", "POST"])
+def add_event(admin_id):
+    admin = AdminInfo.query.filter_by(admin_id=admin_id).one()
+    vend = vendorInfo.query.all()
+    dept = ""
+    if admin:
+        dept = admin.dept
+    if request.method == "GET":
+        return render_template("add_event.html", admin=admin, vend=vend)
+    elif request.method == "POST":
+        file =request.files["register"]
+        event_name = request.form["ename"]
+        spokesperson = request.form["sname"]
+        mode = request.form["mode"]
+        timestamp = request.form["timestamp"]
+        price = request.form["price"]
+        receiving_vendor = request.form.__getitem__("vname")
+        event = events(timestamp=timestamp, name=event_name, spokesperson=spokesperson, mode=mode, issue_dept=dept, created_by=admin_id)
+
+        db.session.add(event)
+        db.session.commit()
+
+        file.save(join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename)))
+        f = open("static/" + secure_filename(file.filename), 'r')
+        val = f.readlines()[1:]
+        for i in val:
+            fields = i.split(',')
+            roll_no = fields[0]
+            name = fields[1]
+            dept = fields[2]
+            email = fields[3]
+            register = Registration(name=name, roll_no=roll_no, dept=dept, email=email, registered_event=event_name)
+            db.session.add(register)
+        db.session.commit()
+        return redirect("/event_admin/" + admin_id)
+
+
+@app.route("/<string:admin_id>/del_event/<int:sl_no>")
+def del_event(admin_id, sl_no):
+    event = events.query.filter_by(sl_no=sl_no).one()
+    if event:
+        db.session.delete(event)
+        db.session.commit()
+        return redirect("/event_admin" + admin_id)
 
 
 @app.route("/logout")
 def logout():
+    session.pop('username', None)
     return redirect("/")
+
+
+from Api.api import AdminAPI, StudentAPI
+api.add_resourse(AdminAPI, "/api/admin/<string:admin_id>", "/api/event_admin/<string:id>", "/api/vendor/<string:vendor_id>")
+api.add_resourse(StudentAPI, "/api/student/<string:roll_no>")
 
 
 if __name__ == '__main__':

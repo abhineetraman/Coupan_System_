@@ -71,7 +71,42 @@
     <div id="header">
         Hi, {{ admin["name"] }}
         <br>
-        <nav class="navbar navbar-inverse">
+        {% if user["role"] == "admin" %}
+            <nav class="navbar navbar-inverse">
+              <div class="container-fluid">
+                <div class="navbar-header">
+                  <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#myNavbar">
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                  </button>
+                </div>
+                <div class="collapse navbar-collapse" id="myNavbar">
+                  <ul class="nav navbar-nav">
+                    <li><a href="/{{ user["role"] }}/{{ admin["admin_id"] }}">Home</a></li>
+                    <li class="dropdown">
+                      <a class="dropdown-toggle" data-toggle="dropdown" href="#">ADD <span class="caret"></span></a>
+                      <ul class="dropdown-menu">
+                        <li><a href="/{{ admin["admin_id"] }}/add_stu">Student</a></li>
+                        <li class="active"><a href="/{{ admin["admin_id"] }}/add_vendor">Vendor</a></li>
+                      </ul>
+                    </li>
+                    <li class="dropdown">
+                      <a class="dropdown-toggle" data-toggle="dropdown" href="#">DELETE <span class="caret"></span></a>
+                      <ul class="dropdown-menu">
+                        <li><a href="/{{ admin["admin_id"] }}/del_stu">Student</a></li>
+                        <li><a href="/{{ admin["admin_id"] }}/del_vendor">Vendor</a></li>
+                      </ul>
+                    </li>
+                  </ul>
+                  <ul class="nav navbar-nav navbar-right">
+                    <li><a href="/logout"><span class="glyphicon glyphicon-log-in"></span> Logout</a></li>
+                  </ul>
+                </div>
+              </div>
+            </nav>
+        {% elif user['role'] == "event_admin" %}
+            <nav class="navbar navbar-inverse">
           <div class="container-fluid">
             <div class="navbar-header">
               <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#myNavbar">
@@ -82,18 +117,17 @@
             </div>
             <div class="collapse navbar-collapse" id="myNavbar">
               <ul class="nav navbar-nav">
-                <li><a href="/admin/{{ admin["admin_id"] }}">Home</a></li>
+                <li><a href="/{{ user["role"] }}/{{ admin["admin_id"] }}">Home</a></li>
                 <li class="dropdown">
                   <a class="dropdown-toggle" data-toggle="dropdown" href="#">ADD <span class="caret"></span></a>
                   <ul class="dropdown-menu">
-                    <li><a href="/{{ admin["admin_id"] }}/add_stu">Student</a></li>
+                    <li><a href="/{{ admin["admin_id"] }}/add_event">Event</a></li>
                     <li class="active"><a href="/{{ admin["admin_id"] }}/add_vendor">Vendor</a></li>
                   </ul>
                 </li>
                 <li class="dropdown">
                   <a class="dropdown-toggle" data-toggle="dropdown" href="#">DELETE <span class="caret"></span></a>
                   <ul class="dropdown-menu">
-                    <li><a href="/{{ admin["admin_id"] }}/del_stu">Student</a></li>
                     <li><a href="/{{ admin["admin_id"] }}/del_vendor">Vendor</a></li>
                   </ul>
                 </li>
@@ -104,6 +138,7 @@
             </div>
           </div>
         </nav>
+        {% endif %}
     </div>
     <div id="main">
         <form class="modal-content animate" action="/{{ admin["admin_id"] }}/add_vendor" method="POST">

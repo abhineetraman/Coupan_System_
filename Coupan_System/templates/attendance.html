@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>ADD Student</title>
+    <title>homepage</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
@@ -24,44 +24,6 @@
                   font-face: bold;
                   }
 
-        /* Full-width input fields */
-    input[type=file] {
-      width: 100%;
-      padding: 12px 20px;
-      margin: 8px 0;
-      display: inline-block;
-      border: 1px solid #ccc;
-      box-sizing: border-box;
-    }
-
-    /* Set a style for all buttons */
-    button {
-      background-color: #04AA6D;
-      color: white;
-      padding: 14px 20px;
-      margin: 8px 0;
-      border: none;
-      cursor: pointer;
-      width: 100%;
-    }
-
-    button:hover {
-      opacity: 0.8;
-    }
-
-    span.psw {
-      float: right;
-      padding-top: 16px;
-    }
-
-    /* Change styles for span and cancel button on extra small screens */
-    @media screen and (max-width: 300px) {
-      span.psw {
-         display: block;
-         float: none;
-      }
-    }
-
     </style>
 </head>
 <body>
@@ -79,18 +41,18 @@
             </div>
             <div class="collapse navbar-collapse" id="myNavbar">
               <ul class="nav navbar-nav">
-                <li><a href="/admin/{{ admin["admin_id"] }}">Home</a></li>
+                <li class="active"><a href="#">Home</a></li>
                 <li class="dropdown">
                   <a class="dropdown-toggle" data-toggle="dropdown" href="#">ADD <span class="caret"></span></a>
                   <ul class="dropdown-menu">
-                    <li class="active"><a href="/{{ admin["admin_id"] }}/add_stu">Student</a></li>
+                    <li><a href="/{{ admin["admin_id"] }}/add_event">Event</a></li>
                     <li><a href="/{{ admin["admin_id"] }}/add_vendor">Vendor</a></li>
                   </ul>
                 </li>
                 <li class="dropdown">
                   <a class="dropdown-toggle" data-toggle="dropdown" href="#">DELETE <span class="caret"></span></a>
                   <ul class="dropdown-menu">
-                    <li><a href="/{{ admin["admin_id"] }}/del_stu">Student</a></li>
+                    <li><a href="/{{ admin["admin_id"] }}/del_event">Event</a></li>
                     <li><a href="/{{ admin["admin_id"] }}/del_vendor">Vendor</a></li>
                   </ul>
                 </li>
@@ -102,26 +64,15 @@
           </div>
         </nav>
     </div>
-    <div id="main">
-        <form class="modal-content animate" action="/{{ admin["admin_id"] }}/add_stu" method="POST" enctype="multipart/form-data">
+    <div id="content">
+        <form id="attendance-report" action="{{ admin["admin_id"] }}/attendance/{{ event_id }}" method="POST">
             <div class="container">
-              <label for="file"><b>Upload File: </b></label>
-              <input type="file" placeholder="Upload .csv file" accept=".text/csv, .csv" name="stu" autocomplete="off" required />
-              input type .csv(roll no, name, dob, email)
-              <button type="submit">Add Student</button>
+                {% for i in candidate %}
+                    <label> {{ i["roll_no"] }}     {{ i["name"] }} </label>
+                    <input type="checkbox" name="{{ i["sl_no"] }}" id="{{ i["sl_no"] }}" />
+                {% endfor %}
             </div>
         </form>
     </div>
-    <script>
-    // Get the modal
-    var modal = document.getElementById('id01');
-
-    // When the user clicks anywhere outside of the modal, close it
-    window.onclick = function(event) {
-        if (event.target == modal) {
-            modal.style.display = "none";
-        }
-    }
-    </script>
 </body>
 </html>
