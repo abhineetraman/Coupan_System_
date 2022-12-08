@@ -382,7 +382,7 @@ def logout():
     return redirect("/")
 
 
-from Api.api import AdminAPI, StudentAPI
+#from Api.api import AdminAPI, StudentAPI
 #api.add_resourse(AdminAPI, "/api/admin/<string:admin_id>", "/api/event_admin/<string:id>", "/api/vendor/<string:vendor_id>")
 #api.add_resourse(StudentAPI, "/api/student/<string:roll_no>")
 
