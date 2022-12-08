@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Index</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+    <style>
+        .blink_me {
+          animation: blinker 2s linear infinite;
+        }
+
+        @keyframes blinker {
+          50% {
+            opacity: 0;
+          }
+        }
+
+        #content {font-size: 48px; }
+        body { text-align: center;
+               font-size: 24px;
+               font-face: aerial-black bold;
+               color: black;
+               }
+
+        #header { text-align: right;
+                  margin-right: 5px;
+                  margin-top: 5px;
+                  }
+
+        #login { background: black;
+                 color: white;
+               }
+
+    </style>
+</head>
+<body>
+    <div id="header">
+        <a href="/login"><input id="login" type="button" value="Login" /></a>
+    </div>
+    <div id="content" class="blink_me">
+        <img src="{{ url_for('static', filename='food_voucher.jpg') }}">
+        <br>
+        Grab the voucher on !!!
+    </div>
+</body>
+</html>
