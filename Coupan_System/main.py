@@ -307,7 +307,11 @@ def attendance(admin_id, event_id):
             value = request.form.getlist(i.sl_no)
             if value:
                 i.atteded = "Yes"
-
+                id, password, dept, name = i.id, i.email, i.dept, i.name
+                user = Users.query.filter_by(id=id).one()
+                if not user:
+                    tmp_user = Users(id=id,password=password,role=student)
+                    tmp_stu = studentInfo(stu_id=id, name=name, dept=dept, email=email)
         db.session.commit()
         participants = Registration.query.filter_by(registered_event=event_name).all()
         quantity = len(participants)
@@ -379,10 +383,10 @@ def logout():
 
 
 from Api.api import AdminAPI, StudentAPI
-api.add_resourse(AdminAPI, "/api/admin/<string:admin_id>", "/api/event_admin/<string:id>", "/api/vendor/<string:vendor_id>")
-api.add_resourse(StudentAPI, "/api/student/<string:roll_no>")
+#api.add_resourse(AdminAPI, "/api/admin/<string:admin_id>", "/api/event_admin/<string:id>", "/api/vendor/<string:vendor_id>")
+#api.add_resourse(StudentAPI, "/api/student/<string:roll_no>")
 
 
 if __name__ == '__main__':
     app.debug = True
-    app.run()
+    app.run(host="0.0.0.0", port="8080")
