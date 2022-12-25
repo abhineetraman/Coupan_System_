@@ -15,8 +15,8 @@ class AdminAPI(Resource):
 
 
 class StudentAPI(Resource):
-    def get(self):
-        pass
+    def get(self, roll_no):
+        db.sess
 
     def post(self):
         pass

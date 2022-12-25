@@ -15,8 +15,9 @@ db = SQLAlchemy()
 api = Api(app)
 db.init_app(app)
 app.app_context().push()
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-timestamp, cost, receiving_vendor = " ", 0, " "
+timestamp, price, receiving_vendor = " ", 0, " "
 
 
 class Users(db.Model):
@@ -57,6 +58,7 @@ class events(db.Model):
     spokesperson = db.Column(db.String, nullable=False)
     mode = db.Column(db.String, nullable=False)
     created_by = db.Column(db.String, db.ForeignKey("admin.admin_id"), nullable=False)
+    price = db.Column(db.Integer)
 
 
 class Coupon(db.Model):
@@ -77,6 +79,23 @@ class Registration(db.Model):
     email = db.Column(db.String, db.ForeignKey("studentInfo.email"), nullable=False)
     registered_event = db.Column(db.String, db.ForeignKey("events.name"), nullable=False)
     attended = db.Column(db.String)
+
+class StudentAPI(Resource):
+    def get(self, roll_no):
+        username = db.session.query(Users).filter(id == roll_no).first()
+        if username:
+            return username
+        else:
+            '', 404
+
+    def post(self):
+        pass
+
+    def put(self):
+        pass
+
+    def delete(self):
+        pass
 
 
 @app.route("/", methods=["GET"])
@@ -152,11 +171,11 @@ def generate_coupon(admin_id):
         quantity = len(stu)
         for i in range(1, quantity+1):
             if len(str(i)) == 1:
-                C_code = dept + year + "00" + str(quantity)
+                C_code = dept + year + "00" + str(i)
             elif len(str(i)) == 2:
-                C_code = dept + year + "0" + str(quantity)
+                C_code = dept + year + "0" + str(i)
             elif len(str(i)) == 3:
-                C_code = dept + year + str(quantity)
+                C_code = dept + year + str(i)
             tmp_Coupon = Coupon(sl_no=quantity, coupon_code=C_code, price=price, validity=validity, issued_to=id)
             db.session.add(tmp_Coupon)
         vendor.issued_dept = dept
@@ -175,7 +194,7 @@ def transfer(admin_id):
             tmp_stu[i].coupon_code = tmp_coup[i].coupon_code
             tmp_coup[i].issued_to = tmp_stu[i].stu_id
         db.session.commit()
-        return redirect("/admin" + admin_id)
+        return redirect("/admin/" + admin_id)
 
     return redirect("/admin/" + admin_id)
 
@@ -184,12 +203,17 @@ def transfer(admin_id):
 def redeem(id, coupon_code):
     coup = Coupon.query.filter_by(coupon_code=coupon_code).one()
     if coup:
-        dept = coup.coupon_code[0:2:]
+        dept = ""
+        a = coup.coupon_code
+        for i in a:
+            if i.isdigit() == False:
+                dept+=i
         vendor = vendorInfo.query.filter_by(issued_dept=dept).all()
         ven = None
+
         for i in vendor:
             print(i)
-            if i.issued_dept == str(coup.coupon_code)[0:2:]:
+            if i.issued_dept == dept:
                 ven = i
                 print(ven, i)
         coup.issued_to = ven.vendor_id
@@ -292,42 +316,54 @@ def delete_vendor(admin_id, vendor_id):
         return redirect("/" + user.role + "/" + admin_id)
 
 
-@app.route("/<string:admin_id>/attendance/<int:event_id>", methods=["GET", "POST"])
+@app.route("/event_admin/<string:admin_id>/attendance/<int:event_id>", methods=["GET", "POST"])
 def attendance(admin_id, event_id):
     admin = AdminInfo.query.filter_by(admin_id=admin_id).one()
-    event = events.query.filter_by(sl_id=event_id).one()
+    event = events.query.filter_by(sl_no=event_id).one()
     event_name = " "
     if event:
         event_name = event.name
-    registered_candidate = Registration.query.filter_by(regisrted_event=event_name).all()
+        price = event.price
+        timestamp = event.timestamp
+    registered_candidate = Registration.query.filter_by(registered_event=event_name).all()
     if request.method == "GET":
         return render_template("attendance.html", admin=admin, candidate=registered_candidate, event_name=event_name, event_id=event_id)
     elif request.method == "POST":
-        for i in registered_candidate:
-            value = request.form.getlist(i.sl_no)
-            if value:
-                i.atteded = "Yes"
-                id, password, dept, name = i.id, i.email, i.dept, i.name
-                user = Users.query.filter_by(id=id).one()
-                if not user:
-                    tmp_user = Users(id=id,password=password,role=student)
-                    tmp_stu = studentInfo(stu_id=id, name=name, dept=dept, email=email)
+        value = request.form.getlist("id")
+        print(value)
+        for j in value:
+            registered_candidate = Registration.query.filter_by(registered_event=event_name, sl_no=j).one()
+            if registered_candidate:
+                registered_candidate.attended = "yes"
+            id, password, email, dept, name = registered_candidate.roll_no, registered_candidate.email, registered_candidate.email, registered_candidate.dept, registered_candidate.name
+            user = Users.query.all()
+            flag = True
+            #if not (Users.query.filter_by(id=id).one()):
+            for i in user:
+                if i.id == id:
+                    flag = False
+                    break
+            if flag:
+                tmp_user = Users(id=id, password=password, role="student")
+                tmp_stu = studentInfo(stu_id=id, name=name, dept=dept, email=email)
+                db.session.add(tmp_user)
+                db.session.add(tmp_stu)
         db.session.commit()
-        participants = Registration.query.filter_by(registered_event=event_name).all()
+        participants = Registration.query.filter_by(registered_event=event_name, attended="yes").all()
         quantity = len(participants)
         year = str(datetime.date.today())[2:4:]
         for i in range(1, quantity + 1):
             if len(str(i)) == 1:
-                C_code = event_name[0:3:].toupper() + year + "00" + str(quantity)
+                C_code = event_name[0:3:].upper() + year + "00" + str(i)
             elif len(str(i)) == 2:
-                C_code = event_name[0:3:].toupper() + year + "0" + str(quantity)
+                C_code = event_name[0:3:].upper() + year + "0" + str(i)
             elif len(str(i)) == 3:
-                C_code = event_name[0:3:].toupper() + year + str(quantity)
-            tmp_Coupon = Coupon(sl_no=quantity, coupon_code=C_code, price=price, validity=timestamp, issued_to=participants[i].roll_no)
+                C_code = event_name[0:3:].upper() + year + str(i)
+            id = participants[i-1].roll_no
+            tmp_Coupon = Coupon(sl_no=i, coupon_code=C_code, price=price, validity=timestamp, issued_to=id)
             db.session.add(tmp_Coupon)
-        vendor.issued_dept = event_name
         db.session.commit()
-        return redirect("/event_admin" + admin_id)
+        return redirect("/event_admin/" + admin_id)
 
 
 @app.route("/<string:admin_id>/add_event", methods=["GET", "POST"])
@@ -347,8 +383,10 @@ def add_event(admin_id):
         timestamp = request.form["timestamp"]
         price = request.form["price"]
         receiving_vendor = request.form.__getitem__("vname")
-        event = events(timestamp=timestamp, name=event_name, spokesperson=spokesperson, mode=mode, issue_dept=dept, created_by=admin_id)
-
+        event = events(timestamp=timestamp, name=event_name, spokesperson=spokesperson, mode=mode, issue_dept=dept, created_by=admin_id, price=price)
+        vendor = vendorInfo.query.filter_by(vendor_id=receiving_vendor).one()
+        if vendor:
+            vendor.issued_dept = event_name[0:2:]
         db.session.add(event)
         db.session.commit()
 
@@ -362,6 +400,10 @@ def add_event(admin_id):
             dept = fields[2]
             email = fields[3]
             register = Registration(name=name, roll_no=roll_no, dept=dept, email=email, registered_event=event_name)
+            user = Users.query.filter_by(id=roll_no).one()
+            if not user:
+                tmp_user = Users(id=roll_no, password=email, role="student")
+            db.session.add(tmp_user)
             db.session.add(register)
         db.session.commit()
         return redirect("/event_admin/" + admin_id)
@@ -389,4 +431,4 @@ def logout():
 
 if __name__ == '__main__':
     app.debug = True
-    app.run(host="0.0.0.0", port="8080")
+    app.run(host="0.0.0.0", port="5000")
